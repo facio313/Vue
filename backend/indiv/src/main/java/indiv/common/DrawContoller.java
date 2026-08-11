@@ -13,13 +13,11 @@ import jakarta.inject.Inject;
 
 @RestController
 @RequestMapping("/api/draw")
-//@CrossOrigin(origins = "*", allowedHeaders = "*") // 특정 클래스에서만 CORS 허용
 public class DrawContoller {
     
 	@Inject
 	private GeometryService geometryService;
 	
-//	@CrossOrigin(origins = "http://localhost:5173") // 특정 메서드에만 CORS 허용
     @PostMapping("/insert")
     public ResponseEntity<?> insertDraw(@RequestBody RequestDTO<GeometryDTO> requestDTO) {
         GeometryDTO geometryDTO = requestDTO.getDto();

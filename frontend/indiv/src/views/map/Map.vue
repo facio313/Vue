@@ -1,34 +1,54 @@
 <template>
     <h1>Map</h1>
+    <p v-if="!hasSpatialLayers" class="demoNotice">
+        공개 데모에는 원본 LH 공간 데이터와 GeoServer가 포함되지 않아 WMS 레이어 조회를 비활성화했습니다.
+        기본 지도와 로컬 도형 그리기는 계속 사용할 수 있습니다.
+    </p>
     <div id="mapBox"></div>
-    <Toggle v-if="map" :map="map" :layers="layers" :createTileLayer="createTileLayer"/>
+    <Toggle
+        v-if="map && hasSpatialLayers"
+        :map="map"
+        :layers="layers"
+        :createTileLayer="createTileLayer"
+    />
     <div class="mouseControl">
-        <label><input type="radio" name="mouseGroup" v-model="selectedTool" value="feature"/>Feature</label>
-        <label><input type="radio" name="mouseGroup" v-model="selectedTool" value="draw"/>Draw</label>
+        <label>
+            <input
+                type="radio"
+                name="mouseGroup"
+                v-model="selectedTool"
+                value="feature"
+                :disabled="!hasSpatialLayers"
+            />
+            공간 레이어 조회
+        </label>
+        <label><input type="radio" name="mouseGroup" v-model="selectedTool" value="draw" />도형 그리기</label>
     </div>
-    <Feature v-if="map && selectedTool == 'feature'" :map="map" :layers="layers"/>
-    <Draw v-if="map && selectedTool == 'draw'" :map="map" />
-    <Marker v-if="map" :map="map"/>
+    <Feature v-if="map && selectedTool === 'feature' && hasSpatialLayers" :map="map" :layers="layers" />
+    <Draw v-if="map && selectedTool === 'draw'" :map="map" />
+    <Marker v-if="map" :map="map" />
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import Toggle from '@/components/map/Toggle.vue';
 import Feature from '@/components/map/Feature.vue';
 import Draw from '@/components/map/Draw.vue';
 import Marker from '@/components/map/Marker.vue';
 
 import { Map, View } from 'ol';
-import { XYZ, TileWMS } from 'ol/source';
+import { OSM, TileWMS, XYZ } from 'ol/source';
 import { fromLonLat } from 'ol/proj';
 import TileLayer from 'ol/layer/Tile';
 import 'ol/ol.css';
 
-
+const geoserverWmsUrl = (import.meta.env.VITE_GEOSERVER_WMS_URL || '').trim();
+const vworldApiKey = (import.meta.env.VITE_VWORLD_API_KEY || '').trim();
+const vworldTileUrlTemplate = (import.meta.env.VITE_VWORLD_TILE_URL_TEMPLATE || '').trim();
 const map = ref(null);
-const selectedTool = ref('feature');
-const API_KEY = ' CD1637AB-53A2-30F7-BF43-CD51495BEB5D';
-const layers = [
+const selectedTool = ref(geoserverWmsUrl ? 'feature' : 'draw');
+
+const layerDefinitions = [
     { name: 'sgg', label: 'SGG Layer', layer: 'lh:tl_sgg', style: 'lh:tl_sgg' },
     { name: 'ground', label: 'Ground Layer', layer: 'lh:tl_ground', style: 'lh:tl_ground' },
     { name: 'rw', label: 'RW Layer', layer: 'lh:tl_rw', style: 'lh:tl_rw' },
@@ -39,60 +59,72 @@ const layers = [
     { name: 'entrance', label: 'Entrance Layer', layer: 'lh:tl_entrance', style: 'lh:tl_entrance' },
     { name: 'test', label: 'Test Layer', layer: 'lh:tl_test', style: 'lh:tl_test' },
 ];
+const layers = geoserverWmsUrl ? layerDefinitions : [];
+const hasSpatialLayers = computed(() => layers.length > 0);
 
-// TileWMS 소스 생성 함수
-const createTileWMSSource = (layer, style) => {
-    return new TileWMS({
-        url: 'http://localhost:8888/geoserver/lh/wms',
-        params: {
-            SERVICE: 'WMS',
-            VERSION: '1.1.0',
-            REQUEST: 'GetMap',
-            LAYERS: layer,
-            SRS: 'EPSG:3857',
-            FORMAT: 'image/png',
-            TILED: true,
-            TRANSPARENT: true,
-            STYLES: style,
-        },
-        serverType: 'geoserver',
-    });
-};
+const createTileWMSSource = (layer, style) => new TileWMS({
+    url: geoserverWmsUrl,
+    params: {
+        SERVICE: 'WMS',
+        VERSION: '1.1.0',
+        REQUEST: 'GetMap',
+        LAYERS: layer,
+        SRS: 'EPSG:3857',
+        FORMAT: 'image/png',
+        TILED: true,
+        TRANSPARENT: true,
+        STYLES: style,
+    },
+    serverType: 'geoserver',
+});
 
-// TileLayer 생성 함수
-const createTileLayer = (layer) => {
-    return new TileLayer({
-        source: createTileWMSSource(layer.layer, layer.style),
-        properties: { name: layer.name }
-    });
+const createTileLayer = (layer) => new TileLayer({
+    source: createTileWMSSource(layer.layer, layer.style),
+    properties: { name: layer.name },
+});
+
+const createBaseSource = () => {
+    if (vworldApiKey && vworldTileUrlTemplate) {
+        return new XYZ({
+            url: vworldTileUrlTemplate.replace('{key}', encodeURIComponent(vworldApiKey)),
+            attributions: ['© VWorld'],
+            maxZoom: 19,
+        });
+    }
+    return new OSM();
 };
 
 onMounted(() => {
     map.value = new Map({
         target: 'mapBox',
         layers: [
-        new TileLayer({
-                source: new XYZ({
-                    url: `/vworld/req/wmts/1.0.0/${API_KEY}/Base/{z}/{y}/{x}.png`,
-                    attributions: ['© VWorld'],
-                    maxZoom: 19,
-                }),
-                properties: { name: 'base' }
-            }),
+            new TileLayer({ source: createBaseSource(), properties: { name: 'base' } }),
             ...layers.map(layer => createTileLayer(layer)),
         ],
         view: new View({
             center: fromLonLat([126.9811405697578, 37.47833241217628]),
-            zoom: 18
+            zoom: 18,
         }),
     });
 });
-
 </script>
 
-<style>
+<style scoped>
 #mapBox {
     width: 100%;
-    height: 70%;
+    height: 62%;
+    min-height: 320px;
+}
+.demoNotice {
+    padding: 12px 14px;
+    border: 1px solid #d8c7b7;
+    border-radius: 8px;
+    background: #fff8ef;
+    line-height: 1.5;
+}
+.mouseControl {
+    display: flex;
+    gap: 16px;
+    margin: 12px 0;
 }
 </style>

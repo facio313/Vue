@@ -24,7 +24,7 @@ const cachedComponents = ref([]);
 // 처음 시작 시 home으로 이동
 onMounted(() => {
     if (route.path === '/') {
-        router.push('/home');
+        router.replace('/home');
         cachedComponents.value.push('Home')
     }
 });
