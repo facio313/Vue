@@ -15,11 +15,31 @@
 
 ## 로컬 개발
 
+모든 포트폴리오 앱은 동일한 인증 환경 규칙을 사용합니다. `main`과 `dev`는
+`PORTFOLIO_AUTH_MODE=sso`이며 Bonifacio SSO 경유로만 접근합니다. 그 밖의 모든 브랜치는
+`PORTFOLIO_AUTH_MODE=local`이고 개발 서버에 직접 접근할 수 있습니다. 브랜치와 명시한 모드가
+다르면 실행이 중단됩니다.
+
+공개 프런트엔드에는 계정 DB나 앱별 로그인 시스템이 없으며, 운영 권한과 사용자 식별은
+Bonifacio SSO에서만 담당합니다.
+
 ```bash
+git switch -c my-feature
 cd frontend/indiv
 npm ci
 npm run dev
 ```
+
+컨테이너를 로컬에서 빌드할 때는 저장소 루트에서 공통 설정을 내보냅니다.
+
+```bash
+export PORTFOLIO_BRANCH="$(git branch --show-current)"
+export PORTFOLIO_AUTH_MODE="$(scripts/portfolio-auth-mode.sh print)"
+docker compose build
+```
+
+`main`과 `dev` 푸시는 SSO 모드 이미지를 만들며, `main`만 `latest`를 갱신하고 운영 배포를
+요청합니다.
 
 외부 연동을 복원할 때는 `.env.example`을 참고해 `.env.local`에 값을 넣습니다. 실제 키나 DB 비밀번호는
 커밋하지 않습니다. `VITE_API_BASE_URL`은 `/api`까지 포함한 기준 URL이고,

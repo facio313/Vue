@@ -3,6 +3,12 @@ services:
     image: ${VUE_IMAGE:-ghcr.io/facio313/vue:latest}
     build:
       context: .
+      args:
+        PORTFOLIO_BRANCH: ${PORTFOLIO_BRANCH:?PORTFOLIO_BRANCH must be set}
+        PORTFOLIO_AUTH_MODE: ${PORTFOLIO_AUTH_MODE:?PORTFOLIO_AUTH_MODE must be set}
+    environment:
+      PORTFOLIO_BRANCH: ${PORTFOLIO_BRANCH:?PORTFOLIO_BRANCH must be set}
+      PORTFOLIO_AUTH_MODE: ${PORTFOLIO_AUTH_MODE:?PORTFOLIO_AUTH_MODE must be set}
     container_name: vue
     restart: unless-stopped
     ports:
